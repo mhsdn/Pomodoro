@@ -229,8 +229,8 @@ if text == "🤖 Помощь от ИИ":
                 reply = "⚠️ ИИ не понял задачи. Попробуйте позже или проверьте ключ."
              await update.message.reply_text(reply)
 
-    else:
-        await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
+         else:
+             await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=main_menu())
