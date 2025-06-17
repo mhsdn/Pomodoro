@@ -39,7 +39,7 @@ def ask_gpt(prompt):
 def load_data():
     global user_tasks, user_settings, session_history
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, ' 'r') as f:
+        with open(DATA_FILE, 'r') as f:
             data = json.load(f)
             user_tasks.update(data.get("tasks", {}))
             user_settings.update(data.get("settings", {}))
@@ -82,7 +82,8 @@ async def start_pomodoro_timer(uid, context, task_text):
     short_break = settings.get("break_short", 5) * 60
     long_break = settings.get("break_long", 15) * 60
 
-    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
+    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}
+Длительность: {duration // 60} минут.")
     await asyncio.sleep(duration)
 
     await context.bot.send_message(chat_id=uid, text="✅ Сессия завершена!")
@@ -120,72 +121,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["menu"] = None
         else:
             await update.message.reply_text("❗ Неверный номер задачи.")
-
-    elif text == "📝 Задачи":
-        task_list = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ {format_due(t.get('due', ''))}" for i, t in enumerate(tasks)])
-        await update.message.reply_text(f"📋 Задачи:\n{task_list}")
-        context.user_data["menu"] = "task_menu"
-        await update.message.reply_text("Выберите действие:", reply_markup=ReplyKeyboardMarkup([
-            [KeyboardButton("➕ Добавить"), KeyboardButton("📝 Редактировать"), KeyboardButton("❌ Удалить")]
-        ], resize_keyboard=True))
-
-    elif menu == "task_menu" and text == "➕ Добавить":
-        context.user_data["menu"] = "task_add_text"
-        await update.message.reply_text("✏️ Введите текст задачи:")
-
-    elif menu == "task_add_text":
-        context.user_data["new_task_text"] = text
-        context.user_data["menu"] = "task_add_due"
-        await update.message.reply_text("🕒 Введите срок (например: '1 час', '2 дня'):")
-
-    elif menu == "task_add_due":
-        task_text = context.user_data.get("new_task_text", "")
-        try:
-            deadline = datetime.utcnow() + parser.parse(f"in {text}") - datetime.utcnow()
-            due_time = (datetime.utcnow() + deadline).isoformat()
-        except:
-            due_time = ""
-        user_tasks[uid].append({"text": task_text, "done": False, "due": due_time})
-        save_data()
-        context.user_data["menu"] = None
-        await update.message.reply_text("✅ Задача добавлена.", reply_markup=main_menu())
-
-    elif menu == "task_menu" and text == "❌ Удалить":
-        task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-        context.user_data["menu"] = "task_delete_select"
-        await update.message.reply_text(f"❌ Какую удалить?\n{task_list}")
-
-    elif menu == "task_delete_select" and text.isdigit():
-        index = int(text) - 1
-        if 0 <= index < len(tasks):
-            deleted = tasks.pop(index)
-            save_data()
-            await update.message.reply_text(f"🗑 Удалено: {deleted['text']}", reply_markup=main_menu())
-        else:
-            await update.message.reply_text("❗ Неверный номер задачи.")
-        context.user_data["menu"] = None
-
-    elif menu == "task_menu" and text == "📝 Редактировать":
-        task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-        context.user_data["menu"] = "task_edit_select"
-        await update.message.reply_text(f"✏️ Какую изменить?\n{task_list}")
-
-    elif menu == "task_edit_select" and text.isdigit():
-        index = int(text) - 1
-        if 0 <= index < len(tasks):
-            context.user_data["edit_index"] = index
-            context.user_data["menu"] = "task_edit_text"
-            await update.message.reply_text("🔁 Введите новый текст задачи:")
-        else:
-            await update.message.reply_text("❗ Неверный номер задачи.")
-
-    elif menu == "task_edit_text":
-        index = context.user_data.get("edit_index")
-        if index is not None:
-            tasks[index]["text"] = text
-            save_data()
-            await update.message.reply_text("✅ Задача обновлена.", reply_markup=main_menu())
-        context.user_data["menu"] = None
 
     elif text == "📊 Статистика":
         today = count_sessions(uid, 1)
@@ -246,4 +181,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-"""
