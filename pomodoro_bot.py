@@ -188,8 +188,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "⚙ Настройки":
         context.user_data["menu"] = "set_all"
-        await update.message.reply_text("Введите значения в формате:
-25(сессия)/5(короткий)/15(длинный)")
+        await update.message.reply_text("""Введите значения в формате:
+25(сессия)/5(короткий)/15(длинный)""")
 
     elif menu == "set_all":
         try:
