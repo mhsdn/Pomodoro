@@ -204,7 +204,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["menu"] = "set_times"
         await update.message.reply_text("⏱ Введите 25/5/15")
 
-elif menu == "set_times":
+if menu == "set_times":
         try:
             work, short, long = map(int, text.split("/"))
             user_settings[uid] = {
@@ -219,7 +219,7 @@ elif menu == "set_times":
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
 
     
-    elif text == "🤖 Помощь от ИИ":
+    if text == "🤖 Помощь от ИИ":
         if not tasks:
             await update.message.reply_text("Нет задач для анализа.")
         else:
