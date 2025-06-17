@@ -221,7 +221,7 @@ if menu == "set_times":
 if text == "🤖 Помощь от ИИ":
          if not tasks:
              await update.message.reply_text("Нет задач для анализа.")
-        else:
+    else:
             task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
             gpt_input = f"Вот список моих задач:\n{task_list}\nС чего начать и почему?"
             reply = ask_gpt(gpt_input)
