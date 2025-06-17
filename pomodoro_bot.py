@@ -139,8 +139,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ Неверный номер задачи.")
 
     elif text == "📝 Задачи":
-        task_list = "
-".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ до {t.get('due', 'нет')}" for i, t in enumerate(tasks)])
+        task_list = "".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ до {t.get('due', 'нет')}" for i, t in enumerate(tasks)])
         await update.message.reply_text(f"📋 Ваши задачи:
 {task_list}", reply_markup=task_menu())
         context.user_data["menu"] = "task_menu"
