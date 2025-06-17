@@ -201,8 +201,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚙ Выберите:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Изменить сессию")]], resize_keyboard=True))
 
     elif text == "Изменить сессию":
-        context.user_data[\"menu\"] = \"set_times\"
-        await update.message.reply_text(\"⏱ Введите 25/5/15\")
+        context.user_data["menu"] = "set_times"
+        await update.message.reply_text("⏱ Введите 25/5/15")
 
 elif menu == "set_times":
         try:
@@ -219,7 +219,7 @@ elif menu == "set_times":
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
 
     
-    elif text == \"🤖 Помощь от ИИ\":
+    elif text == "🤖 Помощь от ИИ":
         if not tasks:
             await update.message.reply_text("Нет задач для анализа.")
         else:
