@@ -170,14 +170,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = len(tasks)
         done = sum(1 for t in tasks if t.get("done"))
         percent = int((done / total) * 100) if total else 0
-        await update.message.reply_text(
-            f"📈 Статистика:
+        await update.message.reply_text (f"""📈 Статистика:
 Сегодня: {today} сессий
 Неделя: {week}
 Месяц: {month}
 
-📋 Выполнено задач: {done}/{total} ({percent}%)"
-        )
+📋 Выполнено задач: {done}/{total} ({percent}%)""")
 
     elif text == "⚙ Настройки":
         context.user_data["menu"] = "set_all"
