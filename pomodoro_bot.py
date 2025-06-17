@@ -127,7 +127,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["menu"] = "task_menu"
 
     
-        await update.message.reply_text(\"Выберите действие:\", reply_markup=ReplyKeyboardMarkup([[KeyboardButton(\"➕ Добавить\"), KeyboardButton(\"📝 Редактировать\"), KeyboardButton(\"❌ Удалить\")]], resize_keyboard=True))
+        await update.message.reply_text("Выберите действие:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("➕ Добавить"), KeyboardButton("📝 Редактировать"), KeyboardButton("❌ Удалить")]], resize_keyboard=True))
 
     elif menu == "task_menu" and text == "➕ Добавить":
         context.user_data["menu"] = "task_add_text"
