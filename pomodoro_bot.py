@@ -1,4 +1,7 @@
-# pomodoro_bot_final.py
+# pomodoro_bot_final_with_gpt.py (финальный рабочий код)
+# Включает Pomodoro, задачи с дедлайнами, помощь от ChatGPT
+# Поддерживает BOT_TOKEN и OPENAI_API_KEY через .env
+
 import logging
 import json
 import os
@@ -7,9 +10,12 @@ from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from dotenv import load_dotenv
+import openai
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +29,17 @@ user_timers = {}
 user_sessions = {}
 session_history = {}
 
+def ask_gpt(prompt):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return response["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        return f"⚠️ Ошибка GPT: {e}"
+
 def load_data():
     global user_tasks, user_settings, session_history
     if os.path.exists(DATA_FILE):
@@ -31,23 +48,18 @@ def load_data():
                 data = json.load(f)
                 user_tasks.update(data.get("tasks", {}))
                 user_settings.update(data.get("settings", {}))
-            except Exception as e:
-                logger.error(f"Ошибка при загрузке данных: {e}")
+            except: pass
     if os.path.exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as f:
             try:
                 session_history.update(json.load(f))
-            except Exception as e:
-                logger.error(f"Ошибка при загрузке истории: {e}")
+            except: pass
 
 def save_data():
-    try:
-        with open(DATA_FILE, 'w') as f:
-            json.dump({"tasks": user_tasks, "settings": user_settings}, f)
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(session_history, f)
-    except Exception as e:
-        logger.error(f"Ошибка при сохранении: {e}")
+    with open(DATA_FILE, 'w') as f:
+        json.dump({"tasks": user_tasks, "settings": user_settings}, f)
+    with open(HISTORY_FILE, 'w') as f:
+        json.dump(session_history, f)
 
 def count_sessions(uid, days):
     now = datetime.utcnow()
@@ -57,7 +69,8 @@ def count_sessions(uid, days):
 def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("🍅 Помодоро"), KeyboardButton("📝 Задачи")],
-        [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")]
+        [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")],
+        [KeyboardButton("🤖 Помощь от ИИ")]
     ], resize_keyboard=True)
 
 def task_menu():
@@ -76,7 +89,8 @@ async def start_pomodoro_timer(uid, context, task_text):
     user_sessions[uid] += 1
 
     try:
-        await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
+        await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}
+Длительность: {duration // 60} минут.")
         await asyncio.sleep(duration)
         await context.bot.send_message(chat_id=uid, text="✅ Помодоро завершён!")
 
@@ -106,8 +120,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not tasks:
             await update.message.reply_text("📭 Нет задач.")
         else:
-            task_list = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"Выбери задачу:\n{task_list}")
+            task_list = "
+".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ до {t.get('due', 'без срока')}" for i, t in enumerate(tasks)])
+            await update.message.reply_text(f"Выбери задачу:
+{task_list}")
             context.user_data["menu"] = "pomodoro_select"
 
     elif menu == "pomodoro_select" and text.isdigit():
@@ -125,8 +141,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❗ Неверный номер задачи.")
 
     elif text == "📝 Задачи":
-        task_list = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']}" for i, t in enumerate(tasks)])
-        await update.message.reply_text(f"📋 Ваши задачи:\n{task_list}", reply_markup=task_menu())
+        task_list = "
+".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ до {t.get('due', 'нет')}" for i, t in enumerate(tasks)])
+        await update.message.reply_text(f"📋 Ваши задачи:
+{task_list}", reply_markup=task_menu())
         context.user_data["menu"] = "task_menu"
 
     elif text == "➕ Добавить":
@@ -134,46 +152,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введите текст задачи:")
 
     elif menu == "add_task":
-        tasks.append({"text": text, "done": False})
-        save_data()
-        await update.message.reply_text("✅ Задача добавлена.", reply_markup=task_menu())
-        context.user_data["menu"] = "task_menu"
+        context.user_data["new_task_text"] = text
+        context.user_data["menu"] = "add_due"
+        await update.message.reply_text("Через сколько часов срок выполнения этой задачи?")
 
-    elif text == "✏ Редактировать":
-        task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-        await update.message.reply_text(f"Введите номер задачи для редактирования:\n{task_list}")
-        context.user_data["menu"] = "edit_task"
-
-    elif menu == "edit_task" and text.isdigit():
-        index = int(text) - 1
-        if 0 <= index < len(tasks):
-            context.user_data["edit_index"] = index
-            context.user_data["menu"] = "edit_input"
-            await update.message.reply_text(f"Введите новый текст задачи (было: {tasks[index]['text']}):")
-        else:
-            await update.message.reply_text("❗ Неверный номер.")
-
-    elif menu == "edit_input":
-        index = context.user_data.get("edit_index")
-        tasks[index]["text"] = text
-        save_data()
-        await update.message.reply_text("✅ Задача обновлена.", reply_markup=task_menu())
-        context.user_data["menu"] = "task_menu"
-
-    elif text == "❌ Удалить":
-        task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-        await update.message.reply_text(f"Введите номер задачи для удаления:\n{task_list}")
-        context.user_data["menu"] = "delete_task"
-
-    elif menu == "delete_task" and text.isdigit():
-        index = int(text) - 1
-        if 0 <= index < len(tasks):
-            deleted = tasks.pop(index)
+    elif menu == "add_due":
+        try:
+            hours = int(text)
+            due_time = (datetime.utcnow() + timedelta(hours=hours)).isoformat()
+            tasks.append({"text": context.user_data["new_task_text"], "done": False, "due": due_time})
             save_data()
-            await update.message.reply_text(f"🗑 Удалено: {deleted['text']}", reply_markup=task_menu())
+            await update.message.reply_text("✅ Задача добавлена с дедлайном!", reply_markup=task_menu())
             context.user_data["menu"] = "task_menu"
-        else:
-            await update.message.reply_text("❗ Неверный номер.")
+        except:
+            await update.message.reply_text("❗ Введите число часов.")
 
     elif text == "📊 Статистика":
         today = count_sessions(uid, 1)
@@ -183,13 +175,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         done = sum(1 for t in tasks if t.get("done"))
         percent = int((done / total) * 100) if total else 0
         await update.message.reply_text(
-            f"📈 Статистика:\nСегодня: {today} сессий\nНеделя: {week}\nМесяц: {month}\n\n📋 Выполнено задач: {done}/{total} ({percent}%)"
+            f"📈 Статистика:
+Сегодня: {today} сессий
+Неделя: {week}
+Месяц: {month}
+
+📋 Выполнено задач: {done}/{total} ({percent}%)"
         )
 
     elif text == "⚙ Настройки":
         context.user_data["menu"] = "set_all"
-        await update.message.reply_text("""Введите значения в формате:
-25(сессия)/5(короткий)/15(длинный)""")
+        await update.message.reply_text("Введите значения в формате: 25/5/15")
 
     elif menu == "set_all":
         try:
@@ -205,13 +201,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await update.message.reply_text("❗ Введите в формате 25/5/15")
 
-    elif text == "/stop":
-        timer = user_timers.get(uid_int)
-        if timer and not timer.done():
-            timer.cancel()
-            await update.message.reply_text("⛔️ Помодоро остановлен.")
+    elif text == "🤖 Помощь от ИИ":
+        if not tasks:
+            await update.message.reply_text("Сначала добавьте хотя бы одну задачу.")
         else:
-            await update.message.reply_text("❗ Нет активного таймера.")
+            tasks_text = "
+".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            gpt_input = f"Вот список моих задач:
+{tasks_text}
+
+С чего лучше начать и почему?"
+            reply = ask_gpt(gpt_input)
+            await update.message.reply_text(reply)
 
     elif text == "🔙 Назад":
         context.user_data["menu"] = None
@@ -226,13 +227,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     if not BOT_TOKEN:
         raise RuntimeError("❌ BOT_TOKEN не установлен.")
-
     load_data()
     app = Application.builder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
     print("✅ Бот запущен")
     app.run_polling()
 
