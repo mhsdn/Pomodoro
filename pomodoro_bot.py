@@ -229,7 +229,7 @@ if text == "🤖 Помощь от ИИ":
             reply = "⚠️ Ошибка"
         await update.message.reply_text(reply)  # ← должно быть здесь
 
-         else:
+    else:
          await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
