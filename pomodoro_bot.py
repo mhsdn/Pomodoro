@@ -189,7 +189,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("ℹ️ Используй /start чтобы открыть меню.")
 
 # === Запуск ===
-async def main():
+def main():
     if not BOT_TOKEN:
         raise RuntimeError("❌ BOT_TOKEN не установлен.")
 
@@ -201,18 +201,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     print("✅ Бот запущен")
-    await app.run_polling()
+    app.run_polling()  # <-- без await
 
 if __name__ == "__main__":
-    import asyncio
-
-    async def safe_main():
-        await main()
-
-    try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(safe_main())
-        loop.run_forever()
-    except KeyboardInterrupt:
-        print("⛔️ Прервано пользователем")
-    
+    main()
