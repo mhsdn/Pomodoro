@@ -218,7 +218,7 @@ if menu == "set_times":
         except:
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
 
-    if text == "🤖 Помощь от ИИ":
+if text == "🤖 Помощь от ИИ":
          if not tasks:
              await update.message.reply_text("Нет задач для анализа.")
         else:
