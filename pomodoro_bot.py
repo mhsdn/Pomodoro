@@ -2,6 +2,7 @@ import logging
 import json
 import os
 import asyncio
+# import openai  # ← Раскомментируй при использовании OpenAI
 from telegram import (
     Update, ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,6 +16,7 @@ from dotenv import load_dotenv
 # === Настройки и переменные ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+# openai.api_key = os.getenv("OPENAI_API_KEY")  # ← Раскомментируй при использовании OpenAI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 DATA_FILE = "tasks_data.json"
 user_tasks = {}
 user_settings = {}
-user_timers = {}  # user_id (int): asyncio.Task
+user_timers = {}
 
 # === Работа с данными ===
 def load_data():
@@ -43,12 +45,13 @@ def save_data():
     except Exception as e:
         logger.error(f"Ошибка при сохранении данных: {e}")
 
-# === Помодоро таймер ===
-async def start_pomodoro_timer(uid, context, task_text, duration=25*60):
+# === Таймер Помодоро ===
+async def start_pomodoro_timer(uid, context, task_text):
+    duration = user_settings.get(str(uid), {}).get("duration", 25) * 60
     try:
         await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
         await asyncio.sleep(duration)
-        await context.bot.send_message(chat_id=uid, text=f"✅ Помодоро завершён!\nСделай короткий перерыв 🧘")
+        await context.bot.send_message(chat_id=uid, text="✅ Помодоро завершён!\nСделай короткий перерыв 🧘")
     except asyncio.CancelledError:
         await context.bot.send_message(chat_id=uid, text="⛔️ Таймер остановлен.")
 
@@ -56,7 +59,8 @@ async def start_pomodoro_timer(uid, context, task_text, duration=25*60):
 def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("🍅 Помодоро"), KeyboardButton("📝 Задачи")],
-        [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")]
+        [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")],
+        [KeyboardButton("🤖 Помощь от ИИ")]
     ], resize_keyboard=True)
 
 def task_menu():
@@ -77,13 +81,14 @@ def settings_menu():
         [KeyboardButton("🔙 Назад")]
     ], resize_keyboard=True)
 
-# === Обработчики ===
+# === Команды ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привет! Главное меню:", reply_markup=main_menu())
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ℹ️ Помощь: /start чтобы начать, 🍅 — запустить помодоро.")
+    await update.message.reply_text("ℹ️ Напиши /start чтобы вернуться в главное меню.")
 
+# === Обработка текста ===
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.message.from_user.id)
     uid_int = int(uid)
@@ -103,17 +108,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         index = int(text) - 1
         if 0 <= index < len(tasks):
             task_text = tasks[index]['text']
-
-            # Остановим старый таймер, если есть
             old_timer = user_timers.get(uid_int)
             if old_timer and not old_timer.done():
                 old_timer.cancel()
-
-            # Запуск нового таймера
             task = asyncio.create_task(start_pomodoro_timer(uid_int, context, task_text))
             user_timers[uid_int] = task
-
-            await update.message.reply_text(f"🍅 Начинаем Помодоро: {task_text}")
+            await update.message.reply_text(f"🍅 Начинаем: {task_text}")
             context.user_data["menu"] = None
         else:
             await update.message.reply_text("❗ Неверный номер задачи.")
@@ -139,7 +139,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "➕ Добавить":
         context.user_data["menu"] = "add"
-        await update.message.reply_text("Введите текст новой задачи:")
+        await update.message.reply_text("Введите новую задачу:")
 
     elif menu == "add":
         tasks.append({"text": text, "done": False})
@@ -149,10 +149,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "✏ Редактировать":
         if not tasks:
-            await update.message.reply_text("📭 Нет задач для редактирования.")
+            await update.message.reply_text("📭 Нет задач.")
         else:
-            task_list = "\n".join([f"{i+1}. {'✅' if t['done'] else '•'} {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"📝 Введите номер задачи для редактирования:\n{task_list}")
+            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            await update.message.reply_text(f"✏ Введите номер задачи:\n{task_list}")
             context.user_data["menu"] = "edit_select"
 
     elif menu == "edit_select":
@@ -161,51 +161,37 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if 0 <= index < len(tasks):
                 context.user_data["edit_index"] = index
                 context.user_data["menu"] = "edit_input"
-                await update.message.reply_text(f"✏ Введите новый текст для задачи:\n📝 {tasks[index]['text']}")
+                await update.message.reply_text(f"✏ Новый текст задачи ({tasks[index]['text']}):")
             else:
-                await update.message.reply_text("❗ Неверный номер задачи.")
+                await update.message.reply_text("❗ Неверный номер.")
         else:
             await update.message.reply_text("❗ Введите корректный номер.")
 
     elif menu == "edit_input":
-        context.user_data["new_text"] = text
         index = context.user_data.get("edit_index")
-        old_text = tasks[index]["text"]
-        new_text = text
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Подтвердить", callback_data="edit_confirm"),
-             InlineKeyboardButton("❌ Отменить", callback_data="edit_cancel")]
-        ])
-        await update.message.reply_text(
-            f"⚠️ Подтвердите изменение:\n\n📎 БЫЛО: {old_text}\n✏ СТАЛО: {new_text}",
-            reply_markup=keyboard
-        )
-        context.user_data["menu"] = "edit_confirm"
+        tasks[index]["text"] = text
+        save_data()
+        await update.message.reply_text("✅ Обновлено.")
+        context.user_data["menu"] = None
 
     elif text == "❌ Удалить":
         if not tasks:
-            await update.message.reply_text("📭 Нет задач для удаления.")
+            await update.message.reply_text("📭 Нет задач.")
         else:
-            task_list = "\n".join([f"{i+1}. {'✅' if t['done'] else '•'} {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"🗑 Введите номер задачи для удаления:\n{task_list}")
+            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            await update.message.reply_text(f"🗑 Введите номер задачи:\n{task_list}")
             context.user_data["menu"] = "delete_select"
 
     elif menu == "delete_select":
         if text.isdigit():
             index = int(text) - 1
             if 0 <= index < len(tasks):
-                context.user_data["delete_index"] = index
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✅ Удалить", callback_data="delete_confirm"),
-                     InlineKeyboardButton("❌ Отмена", callback_data="delete_cancel")]
-                ])
-                await update.message.reply_text(
-                    f"⚠️ Удалить задачу:\n🗑 {tasks[index]['text']}?",
-                    reply_markup=keyboard
-                )
-                context.user_data["menu"] = "delete_confirm"
+                deleted = tasks.pop(index)
+                save_data()
+                await update.message.reply_text(f"🗑 Удалено: {deleted['text']}")
+                context.user_data["menu"] = None
             else:
-                await update.message.reply_text("❗ Неверный номер задачи.")
+                await update.message.reply_text("❗ Неверный номер.")
         else:
             await update.message.reply_text("❗ Введите корректный номер.")
 
@@ -213,88 +199,79 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = len(tasks)
         done = sum(1 for t in tasks if t.get("done"))
         percent = int((done / total) * 100) if total else 0
-        await update.message.reply_text(f"📊 Готово: {done}/{total} задач ({percent}%)")
+        await update.message.reply_text(f"📊 Выполнено: {done}/{total} ({percent}%)")
+
+    elif text == "⚙ Настройки":
+        await update.message.reply_text("Выберите настройку:", reply_markup=settings_menu())
+
+    elif text == "⏱ Установить время":
+        context.user_data["menu"] = "set_timer_duration"
+        await update.message.reply_text("⏱ Введите длительность в минутах (например, 25):")
+
+    elif menu == "set_timer_duration":
+        if text.isdigit():
+            minutes = int(text)
+            if 1 <= minutes <= 120:
+                user_settings.setdefault(uid, {})["duration"] = minutes
+                save_data()
+                await update.message.reply_text(f"✅ Установлено {minutes} минут.", reply_markup=main_menu())
+                context.user_data["menu"] = None
+            else:
+                await update.message.reply_text("❗ Введите значение от 1 до 120.")
+        else:
+            await update.message.reply_text("❗ Введите число.")
+
+    elif text == "🤖 Помощь от ИИ":
+        context.user_data["menu"] = "ai_help"
+        await update.message.reply_text("🧠 Задай вопрос, например:\n— Как сосредоточиться?\n— Сгенерируй задачи по теме 'экзамен'")
+
+    elif menu == "ai_help":
+        query = text.lower()
+
+        # Примеры встроенных ответов
+        if "концентрац" in query:
+            response = "🧘 Чтобы улучшить концентрацию: убери отвлекающие факторы, используй технику Pomodoro, начни с простой задачи."
+        elif "экзамен" in query:
+            response = "📚 Задачи по теме 'экзамен':\n1. Повторить темы\n2. Пройти тесты\n3. Составить шпаргалку\n4. Сделать перерыв"
+        else:
+            response = "🤖 Заглушка: подключи OpenAI для умных ответов."
+
+            # Для OpenAI — раскомментируй:
+            # completion = openai.ChatCompletion.create(
+            #     model="gpt-3.5-turbo",
+            #     messages=[
+            #         {"role": "system", "content": "Ты — помощник по продуктивности."},
+            #         {"role": "user", "content": text}
+            #     ]
+            # )
+            # response = completion.choices[0].message.content
+
+        await update.message.reply_text(response)
+        context.user_data["menu"] = None
 
     elif text in ["🔙 Назад", "🔙 Назад к задачам"]:
         context.user_data["menu"] = None
         await update.message.reply_text("🔙 Главное меню:", reply_markup=main_menu())
 
     else:
-        await update.message.reply_text("🤖 Неизвестная команда. Введите /start")
-
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    uid = str(query.from_user.id)
-    index = context.user_data.get("confirm_index")
-    tasks = user_tasks.get(uid, [])
-
-    if query.data == "confirm_done" and index is not None and 0 <= index < len(tasks):
-        tasks[index]["done"] = True
-        save_data()
-        await query.edit_message_text(f"✅ Завершено: {tasks[index]['text']}")
-        context.user_data["menu"] = None
-
-    elif query.data == "cancel_done":
-        await query.edit_message_text("❎ Отменено.")
-        context.user_data["menu"] = None
-
-    elif query.data == "edit_confirm":
-        index = context.user_data.get("edit_index")
-        new_text = context.user_data.get("new_text")
-        if index is not None and 0 <= index < len(tasks):
-            tasks[index]["text"] = new_text
-            save_data()
-            await query.edit_message_text(f"✅ Задача обновлена:\n{new_text}")
-        else:
-            await query.edit_message_text("❗ Ошибка при обновлении задачи.")
-        context.user_data["menu"] = None
-
-    elif query.data == "edit_cancel":
-        await query.edit_message_text("❎ Редактирование отменено.")
-        context.user_data["menu"] = None
-
-    elif query.data == "delete_confirm":
-        index = context.user_data.get("delete_index")
-        if index is not None and 0 <= index < len(tasks):
-            deleted_task = tasks.pop(index)
-            save_data()
-            await query.edit_message_text(f"🗑 Задача удалена:\n{deleted_task['text']}")
-        else:
-            await query.edit_message_text("❗ Ошибка при удалении задачи.")
-        context.user_data["menu"] = None
-
-    elif query.data == "delete_cancel":
-        await query.edit_message_text("❎ Удаление отменено.")
-        context.user_data["menu"] = None
+        await update.message.reply_text("🤖 Неизвестная команда. Используй /start")
 
 # === Запуск ===
 async def main():
     if not BOT_TOKEN:
-        raise RuntimeError("❌ BOT_TOKEN не установлен. Проверь .env файл.")
+        raise RuntimeError("❌ BOT_TOKEN не установлен.")
 
     load_data()
-
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("stop", handle_text))  # Добавлено для остановки таймера
+    app.add_handler(CommandHandler("stop", handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    app.add_handler(CallbackQueryHandler(handle_callback))
 
     print("✅ Бот запущен")
     await app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-
-    try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
-    except RuntimeError:
-        # Если loop уже работает (например, в Jupyter)
-        import nest_asyncio
-        nest_asyncio.apply()
-        asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
     
