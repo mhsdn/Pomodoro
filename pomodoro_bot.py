@@ -167,8 +167,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["menu"] = None
 
     elif menu == "task_menu" and text == "📝 Редактировать":
-        task_list = "
-".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+        task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
         context.user_data["menu"] = "task_edit_select"
         await update.message.reply_text(f"✏️ Какую изменить? {task_list}")
 
