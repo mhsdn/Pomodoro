@@ -219,18 +219,18 @@ if menu == "set_times":
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
 
 if text == "🤖 Помощь от ИИ":
-         if not tasks:
-             await update.message.reply_text("Нет задач для анализа.")
-         else:
-            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-            gpt_input = f"Вот список моих задач:\n{task_list}\nС чего начать и почему?"
-            reply = ask_gpt(gpt_input)
-            if "pip install openai" in reply or "openai/openai-python" in reply:
-                reply = "⚠️ ИИ не понял задачи. Попробуйте позже или проверьте ключ."
-             await update.message.reply_text(reply)
+    if not tasks:
+        await update.message.reply_text("Нет задач.")
+    else:
+        task_list = "..."
+        gpt_input = "..."
+        reply = ask_gpt(gpt_input)
+        if "pip install" in reply:
+            reply = "⚠️ Ошибка"
+        await update.message.reply_text(reply)  # ← должно быть здесь
 
          else:
-             await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
+         await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=main_menu())
