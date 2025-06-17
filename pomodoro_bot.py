@@ -151,8 +151,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Задача добавлена.", reply_markup=main_menu())
 
     elif menu == "task_menu" and text == "❌ Удалить":
-        task_list = "
-".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+        task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
         context.user_data["menu"] = "task_delete_select"
         await update.message.reply_text(f"❌ Какую удалить?
 {task_list}")
@@ -171,8 +170,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_list = "
 ".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
         context.user_data["menu"] = "task_edit_select"
-        await update.message.reply_text(f"✏️ Какую изменить?
-{task_list}")
+        await update.message.reply_text(f"✏️ Какую изменить? {task_list}")
 
     elif menu == "task_edit_select" and text.isdigit():
         index = int(text) - 1
@@ -197,13 +195,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = len(tasks)
         done = sum(1 for t in tasks if t.get("done"))
         percent = int((done / total) * 100) if total else 0
-        await update.message.reply_text(f"📈 Сегодня: {today} | Неделя: {week} | Месяц: {count_sessions(uid, 30)}
-📋 Выполнено задач: {done}/{total} ({percent}%)")
+        await update.message.reply_text(f"""📈 Сегодня: {today} | Неделя: {week} | Месяц: {count_sessions(uid, 30)}
+📋 Выполнено задач: {done}/{total} ({percent}%)""")
 
     elif text == "⚙ Настройки":
         await update.message.reply_text("⚙ Выберите:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Изменить сессию")]], resize_keyboard=True))
 
-    elif text == \"Изменить сессию\":
+    elif text == "Изменить сессию":
         context.user_data[\"menu\"] = \"set_times\"
         await update.message.reply_text(\"⏱ Введите 25/5/15\")
 
