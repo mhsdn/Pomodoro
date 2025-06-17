@@ -119,8 +119,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not tasks:
             await update.message.reply_text("📭 Нет задач.")
         else:
-            task_list = "
-".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ до {t.get('due', 'без срока')}" for i, t in enumerate(tasks)])
+            task_list = "".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ до {t.get('due', 'без срока')}" for i, t in enumerate(tasks)])
             await update.message.reply_text(f"Выбери задачу:
 {task_list}")
             context.user_data["menu"] = "pomodoro_select"
