@@ -200,10 +200,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Сначала добавьте хотя бы одну задачу.")
         else:
             tasks_text = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-            gpt_input = f"Вот список моих задач:
-{tasks_text}
-
-С чего лучше начать и почему?"
+            gpt_input = f"Вот список моих задач: {tasks_text} С чего лучше начать и почему?"
             reply = ask_gpt(gpt_input)
             await update.message.reply_text(reply)
 
