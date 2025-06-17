@@ -126,21 +126,88 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📋 Задачи:\n{task_list}")
         context.user_data["menu"] = "task_menu"
 
+    
+        await update.message.reply_text(\"Выберите действие:\", reply_markup=ReplyKeyboardMarkup([[KeyboardButton(\"➕ Добавить\"), KeyboardButton(\"📝 Редактировать\"), KeyboardButton(\"❌ Удалить\")]], resize_keyboard=True))
+
+    elif menu == "task_menu" and text == "➕ Добавить":
+        context.user_data["menu"] = "task_add_text"
+        await update.message.reply_text("✏️ Введите текст задачи:")
+
+    elif menu == "task_add_text":
+        context.user_data["new_task_text"] = text
+        context.user_data["menu"] = "task_add_due"
+        await update.message.reply_text("🕒 Введите срок (например: '1 час', '2 дня'):")
+
+    elif menu == "task_add_due":
+        task_text = context.user_data.get("new_task_text", "")
+        try:
+            deadline = datetime.utcnow() + parser.parse(f"in {text}") - datetime.utcnow()
+            due_time = (datetime.utcnow() + deadline).isoformat()
+        except:
+            due_time = ""
+        user_tasks[uid].append({"text": task_text, "done": False, "due": due_time})
+        save_data()
+        context.user_data["menu"] = None
+        await update.message.reply_text("✅ Задача добавлена.", reply_markup=main_menu())
+
+    elif menu == "task_menu" and text == "❌ Удалить":
+        task_list = "
+".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+        context.user_data["menu"] = "task_delete_select"
+        await update.message.reply_text(f"❌ Какую удалить?
+{task_list}")
+
+    elif menu == "task_delete_select" and text.isdigit():
+        index = int(text) - 1
+        if 0 <= index < len(tasks):
+            deleted = tasks.pop(index)
+            save_data()
+            await update.message.reply_text(f"🗑 Удалено: {deleted['text']}", reply_markup=main_menu())
+        else:
+            await update.message.reply_text("❗ Неверный номер задачи.")
+        context.user_data["menu"] = None
+
+    elif menu == "task_menu" and text == "📝 Редактировать":
+        task_list = "
+".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+        context.user_data["menu"] = "task_edit_select"
+        await update.message.reply_text(f"✏️ Какую изменить?
+{task_list}")
+
+    elif menu == "task_edit_select" and text.isdigit():
+        index = int(text) - 1
+        if 0 <= index < len(tasks):
+            context.user_data["edit_index"] = index
+            context.user_data["menu"] = "task_edit_text"
+            await update.message.reply_text("🔁 Введите новый текст задачи:")
+        else:
+            await update.message.reply_text("❗ Неверный номер задачи.")
+
+    elif menu == "task_edit_text":
+        index = context.user_data.get("edit_index")
+        if index is not None:
+            tasks[index]["text"] = text
+            save_data()
+            await update.message.reply_text("✅ Задача обновлена.", reply_markup=main_menu())
+        context.user_data["menu"] = None
+
     elif text == "📊 Статистика":
         today = count_sessions(uid, 1)
         week = count_sessions(uid, 7)
         total = len(tasks)
         done = sum(1 for t in tasks if t.get("done"))
         percent = int((done / total) * 100) if total else 0
-        await update.message.reply_text(
-            f"📈 Сегодня: {today} | Неделя: {week}\n📋 Выполнено задач: {done}/{total} ({percent}%)"
-        )
+        await update.message.reply_text(f"📈 Сегодня: {today} | Неделя: {week} | Месяц: {count_sessions(uid, 30)}
+📋 Выполнено задач: {done}/{total} ({percent}%)")
 
     elif text == "⚙ Настройки":
-        context.user_data["menu"] = "set_times"
-        await update.message.reply_text("⏱ Введите 25/5/15 для сессии/малого/длинного перерыва")
+        await update.message.reply_text("⚙ Выберите:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("Изменить сессию")]], resize_keyboard=True))
 
-    elif menu == "set_times":
+    elif text == \"Изменить сессию\":
+        context.user_data[\"menu\"] = \"set_times\"
+        await update.message.reply_text(\"⏱ Введите 25/5/15\")
+
+elif menu == "set_times":
         try:
             work, short, long = map(int, text.split("/"))
             user_settings[uid] = {
@@ -154,7 +221,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
 
-    elif text == "🤖 Помощь от ИИ":
+    
+    elif text == \"🤖 Помощь от ИИ\":
         if not tasks:
             await update.message.reply_text("Нет задач для анализа.")
         else:
