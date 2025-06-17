@@ -153,8 +153,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif menu == "task_menu" and text == "❌ Удалить":
         task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
         context.user_data["menu"] = "task_delete_select"
-        await update.message.reply_text(f"❌ Какую удалить?
-{task_list}")
+        await update.message.reply_text(f"""❌ Какую удалить?
+{task_list}""")
 
     elif menu == "task_delete_select" and text.isdigit():
         index = int(text) - 1
