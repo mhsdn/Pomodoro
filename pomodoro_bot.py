@@ -39,7 +39,7 @@ def ask_gpt(prompt):
 def load_data():
     global user_tasks, user_settings, session_history
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r') as f:
+        with open(DATA_FILE, ' 'r') as f:
             data = json.load(f)
             user_tasks.update(data.get("tasks", {}))
             user_settings.update(data.get("settings", {}))
@@ -125,9 +125,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_list = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ {format_due(t.get('due', ''))}" for i, t in enumerate(tasks)])
         await update.message.reply_text(f"📋 Задачи:\n{task_list}")
         context.user_data["menu"] = "task_menu"
-
-    
-        await update.message.reply_text("Выберите действие:", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("➕ Добавить"), KeyboardButton("📝 Редактировать"), KeyboardButton("❌ Удалить")]], resize_keyboard=True))
+        await update.message.reply_text("Выберите действие:", reply_markup=ReplyKeyboardMarkup([
+            [KeyboardButton("➕ Добавить"), KeyboardButton("📝 Редактировать"), KeyboardButton("❌ Удалить")]
+        ], resize_keyboard=True))
 
     elif menu == "task_menu" and text == "➕ Добавить":
         context.user_data["menu"] = "task_add_text"
@@ -153,8 +153,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif menu == "task_menu" and text == "❌ Удалить":
         task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
         context.user_data["menu"] = "task_delete_select"
-        await update.message.reply_text(f"""❌ Какую удалить?
-{task_list}""")
+        await update.message.reply_text(f"❌ Какую удалить?\n{task_list}")
 
     elif menu == "task_delete_select" and text.isdigit():
         index = int(text) - 1
@@ -169,7 +168,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif menu == "task_menu" and text == "📝 Редактировать":
         task_list = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
         context.user_data["menu"] = "task_edit_select"
-        await update.message.reply_text(f"✏️ Какую изменить? {task_list}")
+        await update.message.reply_text(f"✏️ Какую изменить?\n{task_list}")
 
     elif menu == "task_edit_select" and text.isdigit():
         index = int(text) - 1
@@ -204,7 +203,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["menu"] = "set_times"
         await update.message.reply_text("⏱ Введите 25/5/15")
 
-if menu == "set_times":
+    elif menu == "set_times":
         try:
             work, short, long = map(int, text.split("/"))
             user_settings[uid] = {
@@ -218,19 +217,19 @@ if menu == "set_times":
         except:
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
 
-if text == "🤖 Помощь от ИИ":
-    if not tasks:
-        await update.message.reply_text("Нет задач.")
-    else:
-        task_list = "..."
-        gpt_input = "..."
-        reply = ask_gpt(gpt_input)
-        if "pip install" in reply:
-            reply = "⚠️ Ошибка"
-        await update.message.reply_text(reply)  # ← должно быть здесь
+    elif text == "🤖 Помощь от ИИ":
+        if not tasks:
+            await update.message.reply_text("Нет задач.")
+        else:
+            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            gpt_input = f"Вот список моих задач:\n{task_list}\nЧто бы ты посоветовал сделать в первую очередь и почему?"
+            reply = ask_gpt(gpt_input)
+            if "pip install" in reply:
+                reply = "⚠️ ИИ не понял задачи. Попробуйте иначе."
+            await update.message.reply_text(reply)
 
     else:
-         await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
+        await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=main_menu())
@@ -247,3 +246,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
