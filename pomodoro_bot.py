@@ -94,7 +94,7 @@ async def start_pomodoro_timer(uid, context, task_text):
         await context.bot.send_message(chat_id=uid, text="✅ Помодоро завершён!")
 
         now = datetime.utcnow().isoformat()
-        session_history.setdefault(str(uid), []).append({"time": now, "task": task_text}")
+        session_history.setdefault(str(uid), []).append({"time": now, "task": task_text})
         save_data()
 
         if user_sessions[uid] % 4 == 0:
