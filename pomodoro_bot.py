@@ -2,33 +2,32 @@ import logging
 import json
 import os
 import asyncio
-# import openai  # ← Раскомментируй при использовании OpenAI
-from telegram import (
-    Update, ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton
-)
+from datetime import datetime, timedelta
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, filters
+    Application, CommandHandler, MessageHandler, ContextTypes, filters
 )
 from dotenv import load_dotenv
 
 # === Настройки и переменные ===
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-# openai.api_key = os.getenv("OPENAI_API_KEY")  # ← Раскомментируй при использовании OpenAI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DATA_FILE = "tasks_data.json"
+HISTORY_FILE = "session_history.json"
+
 user_tasks = {}
 user_settings = {}
 user_timers = {}
+user_sessions = {}
+session_history = {}
 
 # === Работа с данными ===
 def load_data():
-    global user_tasks, user_settings
+    global user_tasks, user_settings, session_history
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'r') as f:
             try:
@@ -37,6 +36,12 @@ def load_data():
                 user_settings.update(data.get("settings", {}))
             except Exception as e:
                 logger.error(f"Ошибка при загрузке данных: {e}")
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r') as f:
+            try:
+                session_history.update(json.load(f))
+            except Exception as e:
+                logger.error(f"Ошибка при загрузке истории: {e}")
 
 def save_data():
     try:
@@ -44,51 +49,58 @@ def save_data():
             json.dump({"tasks": user_tasks, "settings": user_settings}, f)
     except Exception as e:
         logger.error(f"Ошибка при сохранении данных: {e}")
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(session_history, f)
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении истории: {e}")
 
-# === Таймер Помодоро ===
+# === Подсчёт статистики ===
+def count_sessions(uid, days):
+    now = datetime.utcnow()
+    cutoff = now - timedelta(days=days)
+    sessions = session_history.get(str(uid), [])
+    return sum(1 for s in sessions if datetime.fromisoformat(s["time"]) >= cutoff)
+
+# === Таймер Pomodoro ===
 async def start_pomodoro_timer(uid, context, task_text):
-    duration = user_settings.get(str(uid), {}).get("duration", 25) * 60
+    settings = user_settings.get(str(uid), {})
+    duration = settings.get("duration", 25) * 60
+    short_break = settings.get("break_short", 5) * 60
+    long_break = settings.get("break_long", 15) * 60
+
+    user_sessions.setdefault(uid, 0)
+    user_sessions[uid] += 1
+
     try:
         await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
         await asyncio.sleep(duration)
-        await context.bot.send_message(chat_id=uid, text="✅ Помодоро завершён!\nСделай короткий перерыв 🧘")
+        await context.bot.send_message(chat_id=uid, text="✅ Помодоро завершён!")
+
+        now = datetime.utcnow().isoformat()
+        session_history.setdefault(str(uid), []).append({"time": now, "task": task_text})
+        save_data()
+
+        if user_sessions[uid] % 4 == 0:
+            await context.bot.send_message(chat_id=uid, text=f"💤 Длинный перерыв: {long_break // 60} минут.")
+            await asyncio.sleep(long_break)
+        else:
+            await context.bot.send_message(chat_id=uid, text=f"🥤 Короткий перерыв: {short_break // 60} минут.")
+            await asyncio.sleep(short_break)
+
+        await context.bot.send_message(chat_id=uid, text="🔔 Перерыв окончен. Готов продолжать!")
+
     except asyncio.CancelledError:
         await context.bot.send_message(chat_id=uid, text="⛔️ Таймер остановлен.")
 
-# === Меню ===
+# === Главное меню ===
 def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("🍅 Помодоро"), KeyboardButton("📝 Задачи")],
-        [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")],
-        [KeyboardButton("🤖 Помощь от ИИ")]
+        [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")]
     ], resize_keyboard=True)
 
-def task_menu():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("🛠 Управление задачами")],
-        [KeyboardButton("🔙 Назад")]
-    ], resize_keyboard=True)
-
-def manage_menu():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("➕ Добавить"), KeyboardButton("✏ Редактировать"), KeyboardButton("❌ Удалить")],
-        [KeyboardButton("🔙 Назад к задачам")]
-    ], resize_keyboard=True)
-
-def settings_menu():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("⏱ Установить время")],
-        [KeyboardButton("🔙 Назад")]
-    ], resize_keyboard=True)
-
-# === Команды ===
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Привет! Главное меню:", reply_markup=main_menu())
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ℹ️ Напиши /start чтобы вернуться в главное меню.")
-
-# === Обработка текста ===
+# === Обработчик сообщений ===
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.message.from_user.id)
     uid_int = int(uid)
@@ -98,16 +110,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "🍅 Помодоро":
         if not tasks:
-            await update.message.reply_text("📭 Нет задач.", reply_markup=task_menu())
+            await update.message.reply_text("📭 Нет задач.")
         else:
-            task_list = "\n".join([f"{i+1}. {'✅' if t['done'] else '•'} {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"📝 Выбери задачу:\n{task_list}")
+            task_list = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']}" for i, t in enumerate(tasks)])
+            await update.message.reply_text(f"Выбери задачу:\n{task_list}")
             context.user_data["menu"] = "pomodoro_select"
 
     elif menu == "pomodoro_select" and text.isdigit():
         index = int(text) - 1
         if 0 <= index < len(tasks):
-            task_text = tasks[index]['text']
+            task_text = tasks[index]["text"]
             old_timer = user_timers.get(uid_int)
             if old_timer and not old_timer.done():
                 old_timer.cancel()
@@ -126,135 +138,55 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❗ Нет активного таймера.")
 
-    elif text == "📝 Задачи":
-        if not tasks:
-            await update.message.reply_text("📭 Нет задач.", reply_markup=task_menu())
-        else:
-            msg = "\n".join([f"{i+1}. {'✅' if t['done'] else '•'} {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"📋 Ваши задачи:\n{msg}", reply_markup=task_menu())
-        context.user_data["menu"] = None
-
-    elif text == "🛠 Управление задачами":
-        await update.message.reply_text("Выберите действие:", reply_markup=manage_menu())
-
-    elif text == "➕ Добавить":
-        context.user_data["menu"] = "add"
-        await update.message.reply_text("Введите новую задачу:")
-
-    elif menu == "add":
-        tasks.append({"text": text, "done": False})
-        save_data()
-        context.user_data["menu"] = None
-        await update.message.reply_text("✅ Задача добавлена.", reply_markup=task_menu())
-
-    elif text == "✏ Редактировать":
-        if not tasks:
-            await update.message.reply_text("📭 Нет задач.")
-        else:
-            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"✏ Введите номер задачи:\n{task_list}")
-            context.user_data["menu"] = "edit_select"
-
-    elif menu == "edit_select":
-        if text.isdigit():
-            index = int(text) - 1
-            if 0 <= index < len(tasks):
-                context.user_data["edit_index"] = index
-                context.user_data["menu"] = "edit_input"
-                await update.message.reply_text(f"✏ Новый текст задачи ({tasks[index]['text']}):")
-            else:
-                await update.message.reply_text("❗ Неверный номер.")
-        else:
-            await update.message.reply_text("❗ Введите корректный номер.")
-
-    elif menu == "edit_input":
-        index = context.user_data.get("edit_index")
-        tasks[index]["text"] = text
-        save_data()
-        await update.message.reply_text("✅ Обновлено.")
-        context.user_data["menu"] = None
-
-    elif text == "❌ Удалить":
-        if not tasks:
-            await update.message.reply_text("📭 Нет задач.")
-        else:
-            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-            await update.message.reply_text(f"🗑 Введите номер задачи:\n{task_list}")
-            context.user_data["menu"] = "delete_select"
-
-    elif menu == "delete_select":
-        if text.isdigit():
-            index = int(text) - 1
-            if 0 <= index < len(tasks):
-                deleted = tasks.pop(index)
-                save_data()
-                await update.message.reply_text(f"🗑 Удалено: {deleted['text']}")
-                context.user_data["menu"] = None
-            else:
-                await update.message.reply_text("❗ Неверный номер.")
-        else:
-            await update.message.reply_text("❗ Введите корректный номер.")
-
     elif text == "📊 Статистика":
-        total = len(tasks)
-        done = sum(1 for t in tasks if t.get("done"))
-        percent = int((done / total) * 100) if total else 0
-        await update.message.reply_text(f"📊 Выполнено: {done}/{total} ({percent}%)")
+        today = count_sessions(uid, 1)
+        week = count_sessions(uid, 7)
+        month = count_sessions(uid, 30)
+        await update.message.reply_text(
+            f"📈 Статистика:\nСегодня: {today} сессий\nЗа неделю: {week} сессий\nЗа месяц: {month} сессий"
+        )
 
     elif text == "⚙ Настройки":
-        await update.message.reply_text("Выберите настройку:", reply_markup=settings_menu())
+        context.user_data["menu"] = "settings"
+        await update.message.reply_text(
+            "Настройки:\n1 — Время сессии\n2 — Короткий перерыв\n3 — Длинный перерыв",
+        )
 
-    elif text == "⏱ Установить время":
-        context.user_data["menu"] = "set_timer_duration"
-        await update.message.reply_text("⏱ Введите длительность в минутах (например, 25):")
+    elif menu == "settings":
+        if text == "1":
+            context.user_data["menu"] = "set_duration"
+            await update.message.reply_text("Введите длительность сессии (в минутах):")
+        elif text == "2":
+            context.user_data["menu"] = "set_short_break"
+            await update.message.reply_text("Введите длительность короткого перерыва (в минутах):")
+        elif text == "3":
+            context.user_data["menu"] = "set_long_break"
+            await update.message.reply_text("Введите длительность длинного перерыва (в минутах):")
 
-    elif menu == "set_timer_duration":
+    elif menu in {"set_duration", "set_short_break", "set_long_break"}:
         if text.isdigit():
-            minutes = int(text)
-            if 1 <= minutes <= 120:
-                user_settings.setdefault(uid, {})["duration"] = minutes
-                save_data()
-                await update.message.reply_text(f"✅ Установлено {minutes} минут.", reply_markup=main_menu())
-                context.user_data["menu"] = None
-            else:
-                await update.message.reply_text("❗ Введите значение от 1 до 120.")
+            mins = int(text)
+            key = {
+                "set_duration": "duration",
+                "set_short_break": "break_short",
+                "set_long_break": "break_long"
+            }[menu]
+            user_settings.setdefault(uid, {})[key] = mins
+            save_data()
+            await update.message.reply_text(f"✅ Установлено: {mins} минут.", reply_markup=main_menu())
+            context.user_data["menu"] = None
         else:
-            await update.message.reply_text("❗ Введите число.")
-
-    elif text == "🤖 Помощь от ИИ":
-        context.user_data["menu"] = "ai_help"
-        await update.message.reply_text("🧠 Задай вопрос, например:\n— Как сосредоточиться?\n— Сгенерируй задачи по теме 'экзамен'")
-
-    elif menu == "ai_help":
-        query = text.lower()
-
-        # Примеры встроенных ответов
-        if "концентрац" in query:
-            response = "🧘 Чтобы улучшить концентрацию: убери отвлекающие факторы, используй технику Pomodoro, начни с простой задачи."
-        elif "экзамен" in query:
-            response = "📚 Задачи по теме 'экзамен':\n1. Повторить темы\n2. Пройти тесты\n3. Составить шпаргалку\n4. Сделать перерыв"
-        else:
-            response = "🤖 Заглушка: подключи OpenAI для умных ответов."
-
-            # Для OpenAI — раскомментируй:
-            # completion = openai.ChatCompletion.create(
-            #     model="gpt-3.5-turbo",
-            #     messages=[
-            #         {"role": "system", "content": "Ты — помощник по продуктивности."},
-            #         {"role": "user", "content": text}
-            #     ]
-            # )
-            # response = completion.choices[0].message.content
-
-        await update.message.reply_text(response)
-        context.user_data["menu"] = None
-
-    elif text in ["🔙 Назад", "🔙 Назад к задачам"]:
-        context.user_data["menu"] = None
-        await update.message.reply_text("🔙 Главное меню:", reply_markup=main_menu())
+            await update.message.reply_text("❗ Введите корректное число.")
 
     else:
-        await update.message.reply_text("🤖 Неизвестная команда. Используй /start")
+        await update.message.reply_text("🤖 Неизвестная команда. Напиши /start")
+
+# === Команды ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("👋 Привет! Главное меню:", reply_markup=main_menu())
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("ℹ️ Используй /start чтобы открыть меню.")
 
 # === Запуск ===
 async def main():
@@ -266,14 +198,11 @@ async def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("stop", handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     print("✅ Бот запущен")
     await app.run_polling()
 
 if __name__ == "__main__":
-    import nest_asyncio
-    nest_asyncio.apply()
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
     
