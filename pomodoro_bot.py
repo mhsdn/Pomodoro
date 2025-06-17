@@ -199,8 +199,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not tasks:
             await update.message.reply_text("Сначала добавьте хотя бы одну задачу.")
         else:
-            tasks_text = "
-".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            tasks_text = "".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
             gpt_input = f"Вот список моих задач:
 {tasks_text}
 
