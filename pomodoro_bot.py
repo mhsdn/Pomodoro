@@ -1,5 +1,4 @@
-# Вставим исправленный и полный код бота, включая:
-# - правильные отступыimport logging
+import logging
 import json
 import os
 import asyncio
