@@ -64,7 +64,7 @@ def main_menu():
         [KeyboardButton("🤖 Помощь от ИИ")]
     ], resize_keyboard=True)
 
-async 
+
 def tasks_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("➕ Добавить задачу")],
@@ -72,7 +72,40 @@ def tasks_menu():
         [KeyboardButton("❌ Удалить задачу")],
         [KeyboardButton("⬅ Назад")]
     ], resize_keyboard=True)
-def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def format_due(due):
+    try:
+        dt = parser.isoparse(due)
+        delta = dt - datetime.utcnow()
+        hours = int(delta.total_seconds() // 3600)
+        if hours <= 0:
+            return "(срок истёк)"
+        return f"(через {hours} час{'а' if 2 <= hours <= 4 else '' if hours == 1 else 'ов'})"
+    except:
+        return ""
+
+async def start_pomodoro_timer(uid, context, task_text):
+    settings = user_settings.get(str(uid), {})
+    duration = settings.get("duration", 25) * 60
+    short_break = settings.get("break_short", 5) * 60
+    long_break = settings.get("break_long", 15) * 60
+
+    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
+    await asyncio.sleep(duration)
+
+    await context.bot.send_message(chat_id=uid, text="✅ Сессия завершена!")
+    session_history.setdefault(str(uid), []).append({"time": datetime.utcnow().isoformat(), "task": task_text})
+    save_data()
+
+    if len(session_history.get(str(uid), [])) % 4 == 0:
+        await context.bot.send_message(chat_id=uid, text=f"💤 Длинный перерыв: {long_break // 60} минут.")
+        await asyncio.sleep(long_break)
+    else:
+        await context.bot.send_message(chat_id=uid, text=f"🥤 Короткий перерыв: {short_break // 60} минут.")
+        await asyncio.sleep(short_break)
+
+    await context.bot.send_message(chat_id=uid, text="🔔 Перерыв окончен. Готов продолжать!")
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.message.from_user.id)
     text = update.message.text.strip()
     tasks = user_tasks.setdefault(uid, [])
