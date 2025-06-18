@@ -3,8 +3,8 @@ import json
 import os
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from dotenv import load_dotenv
 import openai
 from dateutil import parser
@@ -22,7 +22,6 @@ HISTORY_FILE = "session_history.json"
 
 user_tasks = {}
 user_settings = {}
-user_timers = {}
 session_history = {}
 
 def ask_gpt(prompt):
@@ -61,6 +60,8 @@ def count_sessions(uid, days):
 def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("🍅 Помодоро"), KeyboardButton("📝 Задачи")],
+        [KeyboardButton("➕ Добавить задачу"), KeyboardButton("✏ Редактировать задачу")],
+        [KeyboardButton("❌ Удалить задачу")],
         [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")],
         [KeyboardButton("🤖 Помощь от ИИ")]
     ], resize_keyboard=True)
@@ -82,8 +83,7 @@ async def start_pomodoro_timer(uid, context, task_text):
     short_break = settings.get("break_short", 5) * 60
     long_break = settings.get("break_long", 15) * 60
 
-    await context.bot.send_message(chat_id=uid, text=f"""⏳ Помодоро начат: {task_text}
-Длительность: {duration // 60} минут.""")
+    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
     await asyncio.sleep(duration)
 
     await context.bot.send_message(chat_id=uid, text="✅ Сессия завершена!")
@@ -163,8 +163,66 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply = "⚠️ ИИ не понял задачи. Попробуйте иначе."
             await update.message.reply_text(reply)
 
+    elif text == "➕ Добавить задачу":
+        context.user_data["menu"] = "add_task"
+        await update.message.reply_text("📝 Введите текст задачи:")
+
+    elif menu == "add_task":
+        user_tasks.setdefault(uid, []).append({"text": text, "done": False})
+        save_data()
+        await update.message.reply_text("✅ Задача добавлена", reply_markup=main_menu())
+        context.user_data["menu"] = None
+
+    elif text == "✏ Редактировать задачу":
+        if not tasks:
+            await update.message.reply_text("Нет задач.")
+        else:
+            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            context.user_data["menu"] = "edit_select"
+            await update.message.reply_text(f"Выберите номер задачи:\n{task_list}")
+
+    elif menu == "edit_select" and text.isdigit():
+        index = int(text) - 1
+        if 0 <= index < len(tasks):
+            context.user_data["edit_index"] = index
+            context.user_data["menu"] = "edit_task"
+            await update.message.reply_text("✏ Введите новый текст:")
+        else:
+            await update.message.reply_text("❗ Неверный номер.")
+
+    elif menu == "edit_task":
+        index = context.user_data.pop("edit_index")
+        user_tasks[uid][index]["text"] = text
+        save_data()
+        await update.message.reply_text("✅ Задача обновлена", reply_markup=main_menu())
+        context.user_data["menu"] = None
+
+    elif text == "❌ Удалить задачу":
+        if not tasks:
+            await update.message.reply_text("Нет задач.")
+        else:
+            keyboard = [
+                [InlineKeyboardButton(f"❌ {t['text']}", callback_data=f"del_{i}")]
+                for i, t in enumerate(tasks)
+            ]
+            await update.message.reply_text("Выберите задачу для удаления:", reply_markup=InlineKeyboardMarkup(keyboard))
+
     else:
         await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    uid = str(query.from_user.id)
+
+    if query.data.startswith("del_"):
+        index = int(query.data.split("_")[1])
+        try:
+            removed = user_tasks[uid].pop(index)
+            save_data()
+            await query.edit_message_text(f"🗑 Удалено: {removed['text']}")
+        except IndexError:
+            await query.edit_message_text("❗ Неверный индекс.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=main_menu())
@@ -176,8 +234,10 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CallbackQueryHandler(handle_callback))
     print("✅ Бот запущен")
     app.run_polling()
 
 if __name__ == "__main__":
     main()
+    
