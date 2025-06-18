@@ -3,7 +3,7 @@ import json
 import os
 import asyncio
 from datetime import datetime, timedelta
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from dotenv import load_dotenv
 import openai
@@ -64,7 +64,6 @@ def main_menu():
         [KeyboardButton("🤖 Помощь от ИИ")]
     ], resize_keyboard=True)
 
-
 def tasks_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("➕ Добавить задачу")],
@@ -72,6 +71,7 @@ def tasks_menu():
         [KeyboardButton("❌ Удалить задачу")],
         [KeyboardButton("⬅ Назад")]
     ], resize_keyboard=True)
+
 def format_due(due):
     try:
         dt = parser.isoparse(due)
@@ -166,13 +166,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Нет задач.")
         else:
             task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
-            gpt_input = f"Вот список моих задач:\n{task_list}\nЧто бы ты посоветовал сделать в первую очередь и почему?"
+            gpt_input = f"Вот список моих задач:\\n{task_list}\\nЧто бы ты посоветовал сделать в первую очередь и почему?"
             reply = ask_gpt(gpt_input)
             if "pip install" in reply:
                 reply = "⚠️ ИИ не понял задачи. Попробуйте иначе."
             await update.message.reply_text(reply)
 
-    
     elif text == "⬅ Назад":
         context.user_data["menu"] = None
         await update.message.reply_text("🏠 Главное меню:", reply_markup=tasks_menu())
@@ -182,12 +181,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📝 Введите текст задачи:")
 
     elif menu == "add_task":
-    user_tasks.setdefault(uid,[]).append({"text":text,"done":False})
-    save_data()
-    context.user_data["menu"] = None
-    await update.message.reply_text("✅ Задача добавлена", reply_markup=ReplyKeyboardRemove())
-    await asyncio.sleep(0.5)
-    await update.message.reply_text("🏠 Главное меню:", reply_markup=main_menu())
+        user_tasks.setdefault(uid, []).append({"text": text, "done": False})
+        save_data()
+        context.user_data["menu"] = None
+        await update.message.reply_text("✅ Задача добавлена", reply_markup=ReplyKeyboardRemove())
+        await asyncio.sleep(0.5)
+        await update.message.reply_text("🏠 Главное меню:", reply_markup=main_menu())
 
     elif text == "✏ Редактировать задачу":
         if not tasks:
@@ -256,4 +255,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+"""
