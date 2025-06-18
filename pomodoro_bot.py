@@ -156,7 +156,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "break_long": long
             }
             save_data()
-            await update.message.reply_text(f"✅ Настройки сохранены\n⏱ Работа: {work} мин | Перерыв: {short} мин | Длинный: {long} мин", reply_markup=tasks_menu())
+            await update.message.reply_text(f"✅ Настройки сохранены\n⏱ Работа: {work} мин | Перерыв: {short} мин | Длинный: {long} мин", reply_markup=main_menu())
             context.user_data["menu"] = None
         except:
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
