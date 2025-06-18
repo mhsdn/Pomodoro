@@ -178,7 +178,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "⬅ Назад":
         context.user_data["menu"] = None
-        await update.message.reply_text("🏠 Главное меню:", reply_markup=tasks_menu())
+        await update.message.reply_text("🏠 Главное меню:", reply_markup=main_menu())
 
     elif text == "➕ Добавить задачу":
         context.user_data["menu"] = "add_task"
