@@ -239,7 +239,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❗ Неверный индекс.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=tasks_menu())
+    await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=main_menu())
 
 def main():
     if not BOT_TOKEN:
