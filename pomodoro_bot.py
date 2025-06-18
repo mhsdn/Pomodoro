@@ -62,18 +62,9 @@ def main_menu():
         [KeyboardButton("🍅 Помодоро"), KeyboardButton("📝 Задачи")],
         [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")],
         [KeyboardButton("🤖 Помощь от ИИ")]
-    ], resize_keyboard=True).append({"time": datetime.utcnow().isoformat(), "task": task_text})
-    save_data()
+    ], resize_keyboard=True)
 
-    if len(session_history.get(str(uid), [])) % 4 == 0:
-        await context.bot.send_message(chat_id=uid, text=f"💤 Длинный перерыв: {long_break // 60} минут.")
-        await asyncio.sleep(long_break)
-    else:
-        await context.bot.send_message(chat_id=uid, text=f"🥤 Короткий перерыв: {short_break // 60} минут.")
-        await asyncio.sleep(short_break)
-
-    await context.bot.send_message(chat_id=uid, text="🔔 Перерыв окончен. Готов продолжать!")
-    
+async 
 def tasks_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("➕ Добавить задачу")],
