@@ -167,7 +167,58 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "⬅ Назад":
         context.user_data["menu"] = None
         await update.message.reply_text("🏠 Главное меню:", reply_markup=main_menu())
+        elif text == "➕ Добавить задачу":
+        await update.message.reply_text("✍️ Введите текст новой задачи:")
+        context.user_data["menu"] = "add_task"
 
+    elif menu == "add_task":
+        if text:
+            user_tasks.setdefault(uid, []).append({"text": text, "done": False})
+            save_data()
+            await update.message.reply_text("✅ Задача добавлена.", reply_markup=tasks_menu())
+        else:
+            await update.message.reply_text("❗ Текст задачи не может быть пустым.")
+        context.user_data["menu"] = "tasks"
+
+    elif text == "✏ Редактировать задачу":
+        if not tasks:
+            await update.message.reply_text("📭 Список задач пуст.")
+        else:
+            task_list = "\n".join([f"{i+1}. {t['text']}" for i, t in enumerate(tasks)])
+            await update.message.reply_text(f"🔢 Введите номер задачи для редактирования:\n{task_list}")
+            context.user_data["menu"] = "edit_task_select"
+
+    elif menu == "edit_task_select":
+        if text.isdigit():
+            index = int(text) - 1
+            if 0 <= index < len(tasks):
+                context.user_data["edit_index"] = index
+                await update.message.reply_text("✏ Введите новый текст задачи:")
+                context.user_data["menu"] = "edit_task_text"
+            else:
+                await update.message.reply_text("❗ Неверный номер задачи.")
+        else:
+            await update.message.reply_text("❗ Введите номер задачи числом.")
+
+    elif menu == "edit_task_text":
+        index = context.user_data.get("edit_index")
+        if index is not None:
+            tasks[index]["text"] = text
+            save_data()
+            await update.message.reply_text("✅ Задача обновлена.", reply_markup=tasks_menu())
+        context.user_data["menu"] = "tasks"
+        context.user_data.pop("edit_index", None)
+
+    elif text == "❌ Удалить задачу":
+        if not tasks:
+            await update.message.reply_text("📭 Список задач пуст.")
+        else:
+            markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"{i+1}. {t['text']}", callback_data=f"del_{i}")]
+                for i, t in enumerate(tasks)
+            ])
+            await update.message.reply_text("🗑 Выбери задачу для удаления:", reply_markup=markup)
+            
     else:
         await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
 
