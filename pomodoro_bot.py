@@ -184,7 +184,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif menu == "add_task":
         user_tasks.setdefault(uid, []).append({"text": text, "done": False})
         save_data()
-        await update.message.reply_text("✅ Задача добавлена", reply_markup=tasks_menu())
+        await update.message.reply_text("✅ Задача добавлена", reply_markup=main_menu())
         context.user_data["menu"] = None
 
     elif text == "✏ Редактировать задачу":
