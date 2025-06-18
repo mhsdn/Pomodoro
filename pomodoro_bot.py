@@ -82,8 +82,8 @@ async def start_pomodoro_timer(uid, context, task_text):
     short_break = settings.get("break_short", 5) * 60
     long_break = settings.get("break_long", 15) * 60
 
-    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}
-Длительность: {duration // 60} минут.")
+    await context.bot.send_message(chat_id=uid, text=f"""⏳ Помодоро начат: {task_text}
+Длительность: {duration // 60} минут.""")
     await asyncio.sleep(duration)
 
     await context.bot.send_message(chat_id=uid, text="✅ Сессия завершена!")
