@@ -60,34 +60,9 @@ def count_sessions(uid, days):
 def main_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("🍅 Помодоро"), KeyboardButton("📝 Задачи")],
-        [KeyboardButton("➕ Добавить задачу"), KeyboardButton("✏ Редактировать задачу")],
-        [KeyboardButton("❌ Удалить задачу")],
         [KeyboardButton("📊 Статистика"), KeyboardButton("⚙ Настройки")],
         [KeyboardButton("🤖 Помощь от ИИ")]
-    ], resize_keyboard=True)
-
-def format_due(due):
-    try:
-        dt = parser.isoparse(due)
-        delta = dt - datetime.utcnow()
-        hours = int(delta.total_seconds() // 3600)
-        if hours <= 0:
-            return "(срок истёк)"
-        return f"(через {hours} час{'а' if 2 <= hours <= 4 else '' if hours == 1 else 'ов'})"
-    except:
-        return ""
-
-async def start_pomodoro_timer(uid, context, task_text):
-    settings = user_settings.get(str(uid), {})
-    duration = settings.get("duration", 25) * 60
-    short_break = settings.get("break_short", 5) * 60
-    long_break = settings.get("break_long", 15) * 60
-
-    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
-    await asyncio.sleep(duration)
-
-    await context.bot.send_message(chat_id=uid, text="✅ Сессия завершена!")
-    session_history.setdefault(str(uid), []).append({"time": datetime.utcnow().isoformat(), "task": task_text})
+    ], resize_keyboard=True).append({"time": datetime.utcnow().isoformat(), "task": task_text})
     save_data()
 
     if len(session_history.get(str(uid), [])) % 4 == 0:
@@ -99,7 +74,15 @@ async def start_pomodoro_timer(uid, context, task_text):
 
     await context.bot.send_message(chat_id=uid, text="🔔 Перерыв окончен. Готов продолжать!")
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async 
+def tasks_menu():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("➕ Добавить задачу")],
+        [KeyboardButton("✏ Редактировать задачу")],
+        [KeyboardButton("❌ Удалить задачу")],
+        [KeyboardButton("⬅ Назад")]
+    ], resize_keyboard=True)
+def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = str(update.message.from_user.id)
     text = update.message.text.strip()
     tasks = user_tasks.setdefault(uid, [])
@@ -141,13 +124,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif menu == "set_times":
         try:
             work, short, long = map(int, text.split("/"))
+            if any(v <= 0 for v in (work, short, long)):
+                await update.message.reply_text("❗ Все значения должны быть больше нуля.")
+                return
             user_settings[uid] = {
                 "duration": work,
                 "break_short": short,
                 "break_long": long
             }
             save_data()
-            await update.message.reply_text("✅ Настройки сохранены", reply_markup=main_menu())
+            await update.message.reply_text(f"✅ Настройки сохранены\n⏱ Работа: {work} мин | Перерыв: {short} мин | Длинный: {long} мин", reply_markup=tasks_menu())
             context.user_data["menu"] = None
         except:
             await update.message.reply_text("❗ Формат должен быть 25/5/15")
@@ -163,6 +149,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply = "⚠️ ИИ не понял задачи. Попробуйте иначе."
             await update.message.reply_text(reply)
 
+    
+    elif text == "⬅ Назад":
+        context.user_data["menu"] = None
+        await update.message.reply_text("🏠 Главное меню:", reply_markup=tasks_menu())
+
     elif text == "➕ Добавить задачу":
         context.user_data["menu"] = "add_task"
         await update.message.reply_text("📝 Введите текст задачи:")
@@ -170,7 +161,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif menu == "add_task":
         user_tasks.setdefault(uid, []).append({"text": text, "done": False})
         save_data()
-        await update.message.reply_text("✅ Задача добавлена", reply_markup=main_menu())
+        await update.message.reply_text("✅ Задача добавлена", reply_markup=tasks_menu())
         context.user_data["menu"] = None
 
     elif text == "✏ Редактировать задачу":
@@ -194,7 +185,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         index = context.user_data.pop("edit_index")
         user_tasks[uid][index]["text"] = text
         save_data()
-        await update.message.reply_text("✅ Задача обновлена", reply_markup=main_menu())
+        await update.message.reply_text("✅ Задача обновлена", reply_markup=tasks_menu())
         context.user_data["menu"] = None
 
     elif text == "❌ Удалить задачу":
@@ -208,7 +199,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Выберите задачу для удаления:", reply_markup=InlineKeyboardMarkup(keyboard))
 
     else:
-        await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
+        await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=tasks_menu())
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -225,7 +216,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❗ Неверный индекс.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=main_menu())
+    await update.message.reply_text("👋 Привет! Я твой Pomodoro бот.", reply_markup=tasks_menu())
 
 def main():
     if not BOT_TOKEN:
