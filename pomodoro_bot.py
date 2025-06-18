@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import logging
 import json
 import os
@@ -120,7 +119,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Выбери задачу:\n{task_list}")
             context.user_data["menu"] = "pomodoro_select"
 
-        elif text == "📝 Задачи":
+        elif text == "Задачи":
         task_list = user_tasks.get(uid, [])
         if not task_list:
             await update.message.reply_text("📭 У вас пока нет задач.", reply_markup=tasks_menu())
