@@ -1,3 +1,4 @@
+
 import logging
 import json
 import os
@@ -89,7 +90,8 @@ async def start_pomodoro_timer(uid, context, task_text):
     short_break = settings.get("break_short", 5) * 60
     long_break = settings.get("break_long", 15) * 60
 
-    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}\nДлительность: {duration // 60} минут.")
+    await context.bot.send_message(chat_id=uid, text=f"⏳ Помодоро начат: {task_text}
+Длительность: {duration // 60} минут.")
     await asyncio.sleep(duration)
 
     await context.bot.send_message(chat_id=uid, text="✅ Сессия завершена!")
@@ -121,7 +123,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "📝 Задачи":
         await update.message.reply_text("📋 Меню задач:", reply_markup=tasks_menu())
-        context.user_data["menu"] = "tasks"
 
     elif context.user_data.get("menu") == "pomodoro_select" and text.isdigit():
         index = int(text) - 1
@@ -131,6 +132,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["menu"] = None
         else:
             await update.message.reply_text("❗ Неверный номер задачи.")
+
+    elif text == "➕ Добавить задачу":
+        context.user_data["menu"] = "add_task"
+        await update.message.reply_text("📝 Введите текст задачи:")
+
+    elif menu == "add_task":
+        user_tasks.setdefault(uid, []).append({"text": text, "done": False})
+        save_data()
+        context.user_data["menu"] = None
+        await update.message.reply_text("✅ Задача добавлена", reply_markup=ReplyKeyboardRemove())
+        await asyncio.sleep(0.5)
+        await update.message.reply_text("🏠 Главное меню:", reply_markup=main_menu())
 
     elif text == "📊 Статистика":
         today = count_sessions(uid, 1)
@@ -201,3 +214,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
