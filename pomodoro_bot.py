@@ -73,8 +73,7 @@ def main_menu():
         await asyncio.sleep(short_break)
 
     await context.bot.send_message(chat_id=uid, text="🔔 Перерыв окончен. Готов продолжать!")
-
-async 
+    
 def tasks_menu():
     return ReplyKeyboardMarkup([
         [KeyboardButton("➕ Добавить задачу")],
