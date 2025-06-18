@@ -118,6 +118,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             task_list = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']} ⏳ {format_due(t.get('due', ''))}" for i, t in enumerate(tasks)])
             await update.message.reply_text(f"Выбери задачу:\n{task_list}")
             context.user_data["menu"] = "pomodoro_select"
+            
+    elif text == "📝 Задачи":
+    await update.message.reply_text("📋 Меню задач:", reply_markup=tasks_menu())
+    context.user_data["menu"] = "tasks"
 
     elif context.user_data.get("menu") == "pomodoro_select" and text.isdigit():
         index = int(text) - 1
