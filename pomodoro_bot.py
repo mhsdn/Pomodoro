@@ -220,6 +220,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
             await update.message.reply_text("🗑 Выбери задачу для удаления:", reply_markup=markup)
             
+    elif text == "🤖 Помощь от ИИ":
+        await update.message.reply_text("🧠 Напиши вопрос, и я постараюсь помочь:")
+        context.user_data["menu"] = "ask_gpt"
+
+    elif menu == "ask_gpt":
+        answer = ask_gpt(text)
+        await update.message.reply_text(f"🤖 Ответ:\n{answer}", reply_markup=main_menu())
+        context.user_data["menu"] = None
+        
     else:
         await update.message.reply_text("Неизвестная команда. Напиши /start", reply_markup=main_menu())
 
