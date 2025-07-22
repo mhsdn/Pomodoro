@@ -111,7 +111,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tasks = user_tasks.setdefault(uid, [])
     menu = context.user_data.get("menu")
 
-    if text == "🍅 Помодоро":
+        if text == "🍅 Помодоро":
         if not tasks:
             await update.message.reply_text("Задач нет.")
         else:
@@ -119,7 +119,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Выбери задачу:\n{task_list}")
             context.user_data["menu"] = "pomodoro_select"
 
-        elif text == "Задачи":
+    elif text == "Задачи":
         task_list = user_tasks.get(uid, [])
         if not task_list:
             await update.message.reply_text("📭 У вас пока нет задач.", reply_markup=tasks_menu())
@@ -127,6 +127,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             formatted = "\n".join([f"{i+1}. {'✅' if t.get('done') else '•'} {t['text']}" for i, t in enumerate(task_list)])
             await update.message.reply_text(f"📋 Ваши задачи:\n{formatted}", reply_markup=tasks_menu())
         context.user_data["menu"] = "tasks"
+
 
 
     elif context.user_data.get("menu") == "pomodoro_select" and text.isdigit():
